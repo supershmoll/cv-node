@@ -12,14 +12,20 @@ import { MailResolver } from "./mail.resolver";
     TypeOrmModule.forFeature([MailModel]),
     MailerModule.forRoot({
       transport: {
-        pool: true,
         url: process.env.SMTP_URL,
+        // Remove pool: true to prevent infinite hanging
+        // Add explicit timeouts so it drops the spinner if it fails
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 5000,
       },
       defaults: {
+        // Kept the same, but remember to make the Railway variable just the raw email address!
         from: `"Curriculum Vitae" <${process.env.MAIL_FROM}>`,
       },
       template: {
-        dir: "dist/mail/templates",
+        // Fallback to process.cwd() ensures it always finds the root directory in production
+        dir: process.cwd() + "/dist/mail/templates",
         adapter: new HandlebarsAdapter(),
         options: {
           strict: true,
