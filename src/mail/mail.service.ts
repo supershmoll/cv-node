@@ -1,19 +1,23 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { MailerService } from "@nestjs-modules/mailer";
 import { VerifyMailInput } from "src/graphql";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MailModel } from "./model/mail.model";
 import { UsersService } from "src/users/users.service";
 import { Repository } from "typeorm";
+import { Resend } from "resend";
 
 @Injectable()
 export class MailService {
+  private resend: Resend;
+
   constructor(
     @InjectRepository(MailModel)
     private readonly mailRepository: Repository<MailModel>,
-    private readonly mailerService: MailerService,
-    private readonly usersService: UsersService
-  ) {}
+    private readonly usersService: UsersService,
+  ) {
+    // This grabs the API key from Railway
+    this.resend = new Resend(process.env.RESEND_API_KEY);
+  }
 
   findOneByEmail(email: string) {
     return this.mailRepository.findOne({
@@ -36,16 +40,17 @@ export class MailService {
     }
     await this.mailRepository.save(mail);
 
-    return this.mailerService.sendMail({
+    // Fires over HTTPS, bypassing Railway's port blocking!
+    return this.resend.emails.send({
+      from: `Curriculum Vitae <${process.env.MAIL_FROM}>`,
       to: email,
-      subject: "Verify email.",
-      template: "./confirm-email.hbs",
-      context: {
-        code: otp,
-        duration: "2 hours",
-        url,
-        from: process.env.MAIL_FROM,
-      },
+      subject: "Verify email",
+      html: `
+        <h2>Welcome to Curriculum Vitae!</h2>
+        <p>Your verification code is: <strong>${otp}</strong></p>
+        <p>Or click this link to verify: <a href="${url}">${url}</a></p>
+        <p>This code expires in 2 hours.</p>
+      `,
     });
   }
 
@@ -63,16 +68,18 @@ export class MailService {
     throw new BadRequestException({ message: "Invalid credentials" });
   }
 
-  sendResetPasswordEmail(email: string, url: string) {
-    return this.mailerService.sendMail({
+  async sendResetPasswordEmail(email: string, url: string) {
+    // Fires over HTTPS, bypassing Railway's port blocking!
+    return this.resend.emails.send({
+      from: `Curriculum Vitae <${process.env.MAIL_FROM}>`,
       to: email,
-      subject: "Password reset.",
-      template: "./reset_password.hbs",
-      context: {
-        duration: "10 minutes",
-        url,
-        from: process.env.MAIL_FROM,
-      },
+      subject: "Password Reset Request",
+      html: `
+        <h2>Password Reset</h2>
+        <p>You requested to reset your password.</p>
+        <p>Click here to create a new password: <a href="${url}">${url}</a></p>
+        <p>This link expires in 10 minutes.</p>
+      `,
     });
   }
 
