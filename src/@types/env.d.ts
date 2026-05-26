@@ -10,5 +10,9 @@ declare namespace NodeJS {
     SMTP_URL: string;
     CHROME_WS: string;
     SENTRY_DSN_URL?: string;
+    TELEGRAM_BOT_TOKEN?: string;
+    TELEGRAM_WEBHOOK_SECRET?: string;
+    TELEGRAM_USE_POLLING?: string;
+    BOT_LINK_CODE_TTL_MINUTES?: string;
   }
 }

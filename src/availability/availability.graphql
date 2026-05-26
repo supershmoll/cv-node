@@ -1,0 +1,59 @@
+enum AvailabilityStatus {
+  ON_SHIFT
+  OFF_SHIFT
+  SICK
+  VACATION
+  UNKNOWN
+}
+
+enum AvailabilityUpdatedBy {
+  USER
+  BOT
+  ADMIN
+}
+
+type UserAvailability {
+  userId: ID!
+  user: User!
+  status: AvailabilityStatus!
+  note: String
+  effectiveFrom: String
+  effectiveTo: String
+  updatedAt: String!
+  updatedBy: AvailabilityUpdatedBy!
+}
+
+type AvailabilityEvent {
+  id: ID!
+  userId: ID!
+  status: AvailabilityStatus!
+  note: String
+  effectiveFrom: String
+  effectiveTo: String
+  updatedAt: String!
+  updatedBy: AvailabilityUpdatedBy!
+}
+
+input SetAvailabilityInput {
+  userId: ID
+  status: AvailabilityStatus!
+  note: String
+  effectiveFrom: String
+  effectiveTo: String
+  updatedBy: AvailabilityUpdatedBy
+}
+
+input TeamAvailabilityFilter {
+  departmentId: ID
+  status: AvailabilityStatus
+}
+
+type Query {
+  myAvailability: UserAvailability!
+  teamAvailability(filter: TeamAvailabilityFilter): [UserAvailability!]!
+  availabilityHistory(userId: ID!): [AvailabilityEvent!]!
+}
+
+type Mutation {
+  setAvailability(input: SetAvailabilityInput!): UserAvailability!
+}

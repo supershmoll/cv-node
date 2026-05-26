@@ -1,0 +1,8 @@
+type BotLinkCode {
+  code: String!
+  expiresAt: String!
+}
+
+type Mutation {
+  generateBotLinkCode: BotLinkCode!
+}

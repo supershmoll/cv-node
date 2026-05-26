@@ -17,6 +17,8 @@ import { CvSkillsModule } from "src/cv_skills/cv_skills.module";
 import { CvProjectsModule } from "src/cv_projects/cv_projects.module";
 import { ProjectsModule } from "../projects/projects.module";
 import { MailModule } from "src/mail/mail.module";
+import { AvailabilityModule } from "src/availability/availability.module";
+import { BotModule } from "src/bot/bot.module";
 import { Void } from "./void.scalar";
 import { RolesGuard } from "./guards/roles.guard";
 import { ComplexityPlugin } from "./complexity.plugin";
@@ -58,6 +60,8 @@ import { AccessTokenGuard } from "src/auth/guards/access_token.guard";
     CvSkillsModule,
     CvProjectsModule,
     MailModule,
+    AvailabilityModule,
+    BotModule,
   ],
   providers: [
     ComplexityPlugin,

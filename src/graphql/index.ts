@@ -8,6 +8,20 @@
 /* tslint:disable */
 /* eslint-disable */
 
+export enum AvailabilityStatus {
+    ON_SHIFT = "ON_SHIFT",
+    OFF_SHIFT = "OFF_SHIFT",
+    SICK = "SICK",
+    VACATION = "VACATION",
+    UNKNOWN = "UNKNOWN"
+}
+
+export enum AvailabilityUpdatedBy {
+    USER = "USER",
+    BOT = "BOT",
+    ADMIN = "ADMIN"
+}
+
 export enum Proficiency {
     A1 = "A1",
     A2 = "A2",
@@ -42,6 +56,20 @@ export interface ForgotPasswordInput {
 
 export interface ResetPasswordInput {
     newPassword: string;
+}
+
+export interface SetAvailabilityInput {
+    userId?: Nullable<string>;
+    status: AvailabilityStatus;
+    note?: Nullable<string>;
+    effectiveFrom?: Nullable<string>;
+    effectiveTo?: Nullable<string>;
+    updatedBy?: Nullable<AvailabilityUpdatedBy>;
+}
+
+export interface TeamAvailabilityFilter {
+    departmentId?: Nullable<string>;
+    status?: Nullable<AvailabilityStatus>;
 }
 
 export interface AddCvProjectInput {
@@ -303,6 +331,9 @@ export interface AuthResult {
 
 export interface IQuery {
     login(auth: AuthInput): AuthResult | Promise<AuthResult>;
+    myAvailability(): UserAvailability | Promise<UserAvailability>;
+    teamAvailability(filter?: Nullable<TeamAvailabilityFilter>): UserAvailability[] | Promise<UserAvailability[]>;
+    availabilityHistory(userId: string): AvailabilityEvent[] | Promise<AvailabilityEvent[]>;
     cvs(): Cv[] | Promise<Cv[]>;
     cv(cvId: string): Cv | Promise<Cv>;
     departments(): Department[] | Promise<Department[]>;
@@ -328,6 +359,8 @@ export interface IMutation {
     forgotPassword(auth: ForgotPasswordInput): Nullable<Void> | Promise<Nullable<Void>>;
     resetPassword(auth: ResetPasswordInput): Nullable<Void> | Promise<Nullable<Void>>;
     updateToken(): UpdateTokenResult | Promise<UpdateTokenResult>;
+    setAvailability(input: SetAvailabilityInput): UserAvailability | Promise<UserAvailability>;
+    generateBotLinkCode(): BotLinkCode | Promise<BotLinkCode>;
     addCvProject(project: AddCvProjectInput): Cv | Promise<Cv>;
     updateCvProject(project: UpdateCvProjectInput): Cv | Promise<Cv>;
     removeCvProject(project: RemoveCvProjectInput): Cv | Promise<Cv>;
@@ -366,6 +399,33 @@ export interface IMutation {
     createUser(user: CreateUserInput): User | Promise<User>;
     updateUser(user: UpdateUserInput): User | Promise<User>;
     deleteUser(userId: string): DeleteResult | Promise<DeleteResult>;
+}
+
+export interface UserAvailability {
+    userId: string;
+    user: User;
+    status: AvailabilityStatus;
+    note?: Nullable<string>;
+    effectiveFrom?: Nullable<string>;
+    effectiveTo?: Nullable<string>;
+    updatedAt: string;
+    updatedBy: AvailabilityUpdatedBy;
+}
+
+export interface AvailabilityEvent {
+    id: string;
+    userId: string;
+    status: AvailabilityStatus;
+    note?: Nullable<string>;
+    effectiveFrom?: Nullable<string>;
+    effectiveTo?: Nullable<string>;
+    updatedAt: string;
+    updatedBy: AvailabilityUpdatedBy;
+}
+
+export interface BotLinkCode {
+    code: string;
+    expiresAt: string;
 }
 
 export interface CvProject {

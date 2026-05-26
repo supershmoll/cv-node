@@ -13,6 +13,12 @@ MAIL_FROM=""
 SMTP_URL="smtp://user:password@host:port"
 CHROME_WS="wss://url"
 SENTRY_DSN_URL="https://url"
+
+# Telegram availability bot (optional)
+TELEGRAM_BOT_TOKEN=""
+TELEGRAM_WEBHOOK_SECRET=""
+TELEGRAM_USE_POLLING="true"
+BOT_LINK_CODE_TTL_MINUTES="15"
 ```
 
 ## Local Database & Docker
@@ -50,6 +56,33 @@ Open [http://localhost:3001/api/graphql](http://[::1]:3001/api/graphql) to acces
 ### `npm run build`
 
 Builds the app for production to the `dist` folder.
+
+## Telegram availability bot
+
+The backend includes a Telegram bot for updating employee availability (on shift, sick, vacation, etc.).
+
+### Setup
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
+2. Add to your env file:
+   - `TELEGRAM_BOT_TOKEN` — bot token from BotFather
+   - `TELEGRAM_USE_POLLING=true` — for local dev (no webhook/ngrok needed)
+   - `TELEGRAM_WEBHOOK_SECRET` — optional secret for production webhook
+3. Start the API: `npm start`
+4. In the HRM app, call the `generateBotLinkCode` mutation while logged in.
+5. In Telegram, send `/link <code>` to your bot, then use the menu buttons.
+
+### Production webhook
+
+Register the webhook with Telegram (replace values):
+
+```sh
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+  -d "url=https://your-api-host/api/telegram/webhook" \
+  -d "secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+```
+
+Set `TELEGRAM_USE_POLLING=false` (or remove it) in production.
 
 ## Production
 
