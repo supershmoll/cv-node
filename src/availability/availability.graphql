@@ -1,7 +1,8 @@
 enum AvailabilityStatus {
-  ON_SHIFT
-  OFF_SHIFT
-  SICK
+  OFFICE
+  REMOTE
+  SICK_DAY
+  SICK_LIST
   VACATION
   UNKNOWN
 }

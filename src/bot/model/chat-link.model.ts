@@ -23,6 +23,9 @@ export class ChatLinkModel {
   @Column("varchar", { nullable: true })
   telegramUsername?: string;
 
+  @Column("varchar", { default: "en" })
+  locale: string;
+
   @ManyToOne(() => UserModel, { onDelete: "CASCADE" })
   @JoinColumn({ name: "userId" })
   user: UserModel;

@@ -48,7 +48,11 @@ export class AvailabilityService {
 
     if (requesterRole !== UserRole.Admin) {
       if (!requester.department) {
-        return [];
+        const mine = await this.getMyAvailability(requesterId);
+        if (filter?.status && mine.status !== filter.status) {
+          return [];
+        }
+        return [mine];
       }
       query.andWhere("department.id = :departmentId", {
         departmentId: requester.department.id,
@@ -63,7 +67,20 @@ export class AvailabilityService {
       query.andWhere("availability.status = :status", { status: filter.status });
     }
 
-    return query.getMany();
+    let results = await query.getMany();
+
+    const includesRequester = results.some(
+      (row) => String(row.userId) === String(requesterId)
+    );
+
+    if (!includesRequester) {
+      const mine = await this.getMyAvailability(requesterId);
+      if (!filter?.status || mine.status === filter.status) {
+        results = [...results, mine];
+      }
+    }
+
+    return results;
   }
 
   getAvailabilityHistory(userId: string) {

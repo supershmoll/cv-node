@@ -3,15 +3,23 @@ import { AvailabilityStatus } from "src/graphql";
 import { AvailabilityService } from "src/availability/availability.service";
 import { BotLinkService } from "../bot-link.service";
 import { DailyStatusService } from "../daily-status.service";
-import { ChatPlatform } from "../model/chat-link.model";
-import { STATUS_LABELS, UNAUTHORIZED_BOT_MESSAGE } from "../bot.constants";
+import { ChatLinkModel, ChatPlatform } from "../model/chat-link.model";
 import {
   TelegramCallbackQuery,
   TelegramMessage,
   TelegramUpdate,
 } from "./telegram.types";
 import { TelegramApiService } from "./telegram-api.service";
-import { buildStatusKeyboard } from "./telegram-messages";
+import { buildStatusKeyboard, buildLanguageKeyboard } from "./telegram-messages";
+import type { BotLocale } from "./i18n/bot-locale";
+import { resolveBotLocale } from "./i18n/bot-locale";
+import {
+  parseRequestedLocale,
+  translateBotMessage,
+  translateLinkError,
+  translateLocaleLabel,
+  translateStatusLabel,
+} from "./i18n/messages";
 
 @Injectable()
 export class TelegramUpdateHandler {
@@ -38,6 +46,7 @@ export class TelegramUpdateHandler {
   private async handleMessage(message: TelegramMessage) {
     const chatId = String(message.chat.id);
     const text = message.text?.trim() ?? "";
+    const languageCode = message.from?.language_code;
 
     if (text.startsWith("/start")) {
       await this.handleStart(message);
@@ -45,28 +54,51 @@ export class TelegramUpdateHandler {
     }
 
     const link = await this.botLinkService.findByExternalChat(ChatPlatform.TELEGRAM, chatId);
+    const locale = link
+      ? await this.botLinkService.syncBotLocale(link, languageCode)
+      : resolveBotLocale(languageCode);
+
     if (!link) {
-      await this.telegramApi.sendMessage(chatId, UNAUTHORIZED_BOT_MESSAGE);
+      await this.telegramApi.sendMessage(
+        chatId,
+        translateBotMessage(locale, "unauthorized")
+      );
       return;
     }
 
     if (text.startsWith("/status")) {
-      await this.sendCurrentStatus(chatId, link.userId, link.user.profile?.full_name ?? link.user.email);
+      await this.sendCurrentStatus(
+        chatId,
+        link,
+        link.user.profile?.full_name ?? link.user.email,
+        locale
+      );
       return;
     }
 
     if (text.startsWith("/help")) {
-      await this.sendHelp(chatId);
+      await this.sendHelp(chatId, locale);
       return;
     }
 
-    await this.telegramApi.sendMessage(chatId, "Use the buttons below to confirm today's status.", buildStatusKeyboard());
+    if (text.startsWith("/lang") || text.startsWith("/language")) {
+      await this.handleLanguageCommand(chatId, link, locale, text);
+      return;
+    }
+
+    await this.telegramApi.sendMessage(
+      chatId,
+      translateBotMessage(locale, "useButtonsBelow"),
+      buildStatusKeyboard(locale)
+    );
   }
 
   private async handleStart(message: TelegramMessage) {
     const chatId = String(message.chat.id);
     const parts = message.text?.trim().split(/\s+/) ?? [];
     const code = parts[1];
+    const languageCode = message.from?.language_code;
+    const locale = resolveBotLocale(languageCode);
 
     if (code) {
       try {
@@ -74,52 +106,91 @@ export class TelegramUpdateHandler {
           ChatPlatform.TELEGRAM,
           chatId,
           code,
-          message.from?.username
+          message.from?.username,
+          languageCode
         );
+        const linkLocale = this.botLinkService.getLinkLocale(link);
         const name = link.user.profile?.full_name ?? link.user.email;
         await this.telegramApi.sendMessage(
           chatId,
-          `Telegram linked to ${name}. You will receive daily status prompts at 9:00 MSK.`,
-          buildStatusKeyboard()
+          translateBotMessage(linkLocale, "linkedSuccess", { name }),
+          buildStatusKeyboard(linkLocale)
         );
       } catch (error) {
-        await this.telegramApi.sendMessage(chatId, this.extractErrorMessage(error));
+        await this.telegramApi.sendMessage(
+          chatId,
+          this.extractErrorMessage(error, locale)
+        );
       }
       return;
     }
 
     const link = await this.botLinkService.findByExternalChat(ChatPlatform.TELEGRAM, chatId);
     if (link) {
+      const linkLocale = await this.botLinkService.syncBotLocale(link, languageCode);
       const name = link.user.profile?.full_name ?? link.user.email;
       await this.telegramApi.sendMessage(
         chatId,
-        `Welcome back, ${name}. Confirm today's status:`,
-        buildStatusKeyboard()
+        translateBotMessage(linkLocale, "welcomeBack", { name }),
+        buildStatusKeyboard(linkLocale)
       );
       return;
     }
 
-    await this.telegramApi.sendMessage(chatId, UNAUTHORIZED_BOT_MESSAGE);
+    await this.telegramApi.sendMessage(
+      chatId,
+      translateBotMessage(locale, "unauthorized")
+    );
   }
 
   private async handleCallbackQuery(callback: TelegramCallbackQuery) {
     const chatId = String(callback.message?.chat.id ?? callback.from.id);
     const data = callback.data ?? "";
+    const languageCode = callback.from.language_code;
 
     const link = await this.botLinkService.findByExternalChat(ChatPlatform.TELEGRAM, chatId);
+    const locale = link
+      ? await this.botLinkService.syncBotLocale(link, languageCode)
+      : resolveBotLocale(languageCode);
+
     if (!link) {
       await this.telegramApi.answerCallbackQuery(callback.id);
-      await this.telegramApi.sendMessage(chatId, UNAUTHORIZED_BOT_MESSAGE);
+      await this.telegramApi.sendMessage(
+        chatId,
+        translateBotMessage(locale, "unauthorized")
+      );
       return;
     }
 
     await this.telegramApi.answerCallbackQuery(callback.id);
 
+    if (data.startsWith("locale:")) {
+      const requestedLocale = parseRequestedLocale(data.replace("locale:", ""));
+      if (!requestedLocale) {
+        await this.telegramApi.sendMessage(
+          chatId,
+          translateBotMessage(locale, "lang.invalid")
+        );
+        return;
+      }
+
+      const updatedLocale = await this.botLinkService.setBotLocale(link, requestedLocale);
+      await this.telegramApi.sendMessage(
+        chatId,
+        translateBotMessage(updatedLocale, "lang.updated", {
+          language: translateLocaleLabel(updatedLocale),
+        }),
+        buildStatusKeyboard(updatedLocale)
+      );
+      return;
+    }
+
     if (data === "action:status") {
       await this.sendCurrentStatus(
         chatId,
-        link.userId,
-        link.user.profile?.full_name ?? link.user.email
+        link,
+        link.user.profile?.full_name ?? link.user.email,
+        locale
       );
       return;
     }
@@ -127,7 +198,10 @@ export class TelegramUpdateHandler {
     if (data.startsWith("status:")) {
       const status = data.replace("status:", "") as AvailabilityStatus;
       if (!Object.values(AvailabilityStatus).includes(status)) {
-        await this.telegramApi.sendMessage(chatId, "Unknown status option.");
+        await this.telegramApi.sendMessage(
+          chatId,
+          translateBotMessage(locale, "unknownStatusOption")
+        );
         return;
       }
 
@@ -139,60 +213,112 @@ export class TelegramUpdateHandler {
         await this.dailyStatusService.confirmToday(String(link.userId), status);
         await this.telegramApi.sendMessage(
           chatId,
-          `Status confirmed for today: ${STATUS_LABELS[availability.status]}.`,
-          buildStatusKeyboard()
+          translateBotMessage(locale, "statusConfirmed", {
+            status: translateStatusLabel(locale, availability.status),
+          }),
+          buildStatusKeyboard(locale)
         );
       } catch (error) {
         this.logger.error("Failed to update status from Telegram", error);
         await this.telegramApi.sendMessage(
           chatId,
-          "Could not update status. Try again in a few seconds."
+          translateBotMessage(locale, "updateFailed")
         );
       }
     }
   }
 
-  private async sendCurrentStatus(chatId: string, userId: string, name: string) {
-    const availability = await this.availabilityService.getMyAvailability(String(userId));
-    const todayCheck = await this.dailyStatusService.getTodayCheck(String(userId));
+  private async sendCurrentStatus(
+    chatId: string,
+    link: ChatLinkModel,
+    name: string,
+    locale: BotLocale
+  ) {
+    const availability = await this.availabilityService.getMyAvailability(String(link.userId));
+    const todayCheck = await this.dailyStatusService.getTodayCheck(String(link.userId));
+    const statusLabel = translateStatusLabel(locale, availability.status);
     const confirmedToday = todayCheck?.confirmedAt
-      ? `\nToday confirmed: ${STATUS_LABELS[todayCheck.confirmedStatus ?? availability.status]}`
-      : "\nToday's status is not confirmed yet.";
+      ? translateBotMessage(locale, "todayConfirmed", {
+          status: translateStatusLabel(
+            locale,
+            todayCheck.confirmedStatus ?? availability.status
+          ),
+        })
+      : translateBotMessage(locale, "todayNotConfirmed");
 
     await this.telegramApi.sendMessage(
       chatId,
-      `${name}\nCurrent status: ${STATUS_LABELS[availability.status]}${confirmedToday}`,
-      buildStatusKeyboard()
+      translateBotMessage(locale, "currentStatusHeader", {
+        name,
+        status: statusLabel,
+        confirmed: confirmedToday,
+      }),
+      buildStatusKeyboard(locale)
     );
   }
 
-  private async sendHelp(chatId: string) {
+  private async sendHelp(chatId: string, locale: BotLocale) {
     await this.telegramApi.sendMessage(
       chatId,
       [
-        "This bot is linked to your HRM account.",
-        "Choose a status button before 12:00 MSK each day.",
-        "/status - show current status",
+        translateBotMessage(locale, "help.line1"),
+        translateBotMessage(locale, "help.line2"),
+        translateBotMessage(locale, "help.line3"),
+        translateBotMessage(locale, "help.line4"),
       ].join("\n"),
-      buildStatusKeyboard()
+      buildStatusKeyboard(locale)
     );
   }
 
-  private extractErrorMessage(error: unknown) {
+  private async handleLanguageCommand(
+    chatId: string,
+    link: ChatLinkModel,
+    locale: BotLocale,
+    text: string
+  ) {
+    const parts = text.trim().split(/\s+/);
+    const requestedLocale = parseRequestedLocale(parts[1]);
+
+    if (requestedLocale) {
+      const updatedLocale = await this.botLinkService.setBotLocale(link, requestedLocale);
+      await this.telegramApi.sendMessage(
+        chatId,
+        translateBotMessage(updatedLocale, "lang.updated", {
+          language: translateLocaleLabel(updatedLocale),
+        }),
+        buildStatusKeyboard(updatedLocale)
+      );
+      return;
+    }
+
+    await this.telegramApi.sendMessage(
+      chatId,
+      [
+        translateBotMessage(locale, "lang.current", {
+          language: translateLocaleLabel(locale),
+        }),
+        translateBotMessage(locale, "lang.choose"),
+      ].join("\n\n"),
+      buildLanguageKeyboard(locale)
+    );
+  }
+
+  private extractErrorMessage(error: unknown, locale: BotLocale) {
     if (error instanceof Error) {
       const response = (error as Error & { response?: string | { message?: string | string[] } })
         .response;
       if (typeof response === "string") {
-        return response;
+        return translateLinkError(locale, response);
       }
       if (response && typeof response === "object" && response.message) {
-        return Array.isArray(response.message)
+        const message = Array.isArray(response.message)
           ? response.message.join(", ")
           : response.message;
+        return translateLinkError(locale, message);
       }
-      return error.message;
+      return translateLinkError(locale, error.message);
     }
-    return "Something went wrong.";
+    return translateBotMessage(locale, "somethingWentWrong");
   }
 }
 

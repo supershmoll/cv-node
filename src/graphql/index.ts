@@ -9,9 +9,10 @@
 /* eslint-disable */
 
 export enum AvailabilityStatus {
-    ON_SHIFT = "ON_SHIFT",
-    OFF_SHIFT = "OFF_SHIFT",
-    SICK = "SICK",
+    OFFICE = "OFFICE",
+    REMOTE = "REMOTE",
+    SICK_DAY = "SICK_DAY",
+    SICK_LIST = "SICK_LIST",
     VACATION = "VACATION",
     UNKNOWN = "UNKNOWN"
 }

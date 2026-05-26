@@ -16,6 +16,11 @@ import {
   normalizeTelegramUsername,
 } from "./bot.constants";
 import { UsersService } from "src/users/users.service";
+import {
+  BotLocale,
+  DEFAULT_BOT_LOCALE,
+  resolveBotLocale,
+} from "./telegram/i18n/bot-locale";
 
 @Injectable()
 export class BotLinkService {
@@ -95,7 +100,8 @@ export class BotLinkService {
     platform: ChatPlatform,
     externalChatId: string,
     code: string,
-    telegramUsernameFromMessage?: string
+    telegramUsernameFromMessage?: string,
+    languageCode?: string
   ) {
     const linkCode = await this.chatLinkCodeRepository.findOne({
       where: { code },
@@ -140,6 +146,7 @@ export class BotLinkService {
         externalChatId,
         userId: linkCode.userId,
         telegramUsername: linkCode.telegramUsername,
+        locale: resolveBotLocale(languageCode),
         user: linkCode.user,
       })
     );
@@ -167,6 +174,34 @@ export class BotLinkService {
     return this.chatLinkRepository.findOne({
       where: { platform, userId: String(userId) },
     });
+  }
+
+  async syncBotLocale(link: ChatLinkModel, languageCode?: string | null) {
+    const locale = resolveBotLocale(languageCode);
+    if (link.locale === locale) {
+      return locale;
+    }
+
+    await this.chatLinkRepository.update({ id: link.id }, { locale });
+    link.locale = locale;
+    return locale;
+  }
+
+  async setBotLocale(link: ChatLinkModel, locale: BotLocale) {
+    if (link.locale === locale) {
+      return locale;
+    }
+
+    await this.chatLinkRepository.update({ id: link.id }, { locale });
+    link.locale = locale;
+    return locale;
+  }
+
+  getLinkLocale(link?: Pick<ChatLinkModel, "locale"> | null): BotLocale {
+    if (link?.locale === "ru" || link?.locale === "en") {
+      return link.locale;
+    }
+    return DEFAULT_BOT_LOCALE;
   }
 
   private async createLinkCode() {

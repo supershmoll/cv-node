@@ -11,8 +11,8 @@ import {
 } from "./bot.constants";
 import { TelegramApiService } from "./telegram/telegram-api.service";
 import {
-  MORNING_PROMPT_TEXT,
-  FORCE_LOGOUT_TEXT,
+  buildForceLogoutText,
+  buildMorningPromptText,
   buildReminderText,
   buildStatusKeyboard,
 } from "./telegram/telegram-messages";
@@ -30,17 +30,19 @@ export class DailyStatusScheduler {
 
   @Cron(`0 ${MORNING_PROMPT_HOUR} * * *`, { timeZone: STATUS_CHECK_TIMEZONE })
   async sendMorningPrompts() {
-    await this.broadcastToUnconfirmed(MORNING_PROMPT_TEXT, { createDailyCheck: true });
+    await this.broadcastToUnconfirmed((locale) => buildMorningPromptText(locale), {
+      createDailyCheck: true,
+    });
   }
 
   @Cron(`0 ${REMINDER_HOURS[0]} * * *`, { timeZone: STATUS_CHECK_TIMEZONE })
   async sendTenAmReminder() {
-    await this.broadcastToUnconfirmed(buildReminderText(REMINDER_HOURS[0]));
+    await this.broadcastToUnconfirmed((locale) => buildReminderText(locale, REMINDER_HOURS[0]));
   }
 
   @Cron(`0 ${REMINDER_HOURS[1]} * * *`, { timeZone: STATUS_CHECK_TIMEZONE })
   async sendElevenAmReminder() {
-    await this.broadcastToUnconfirmed(buildReminderText(REMINDER_HOURS[1]));
+    await this.broadcastToUnconfirmed((locale) => buildReminderText(locale, REMINDER_HOURS[1]));
   }
 
   @Cron(`0 ${DEADLINE_HOUR} * * *`, { timeZone: STATUS_CHECK_TIMEZONE })
@@ -59,8 +61,13 @@ export class DailyStatusScheduler {
 
       const link = links.find((item) => String(item.userId) === userId);
       if (link) {
+        const locale = this.botLinkService.getLinkLocale(link);
         await this.telegramApi
-          .sendMessage(link.externalChatId, FORCE_LOGOUT_TEXT, buildStatusKeyboard())
+          .sendMessage(
+            link.externalChatId,
+            buildForceLogoutText(locale),
+            buildStatusKeyboard(locale)
+          )
           .catch((error) => this.logger.error(`Failed to notify user ${userId}`, error));
       }
     }
@@ -69,7 +76,7 @@ export class DailyStatusScheduler {
   }
 
   private async broadcastToUnconfirmed(
-    message: string,
+    buildMessage: (locale: ReturnType<BotLinkService["getLinkLocale"]>) => string,
     options: { createDailyCheck?: boolean } = {}
   ) {
     if (!this.telegramApi.isConfigured()) {
@@ -80,6 +87,7 @@ export class DailyStatusScheduler {
 
     for (const link of links) {
       const userId = String(link.userId);
+      const locale = this.botLinkService.getLinkLocale(link);
 
       if (options.createDailyCheck) {
         await this.dailyStatusService.ensureDailyCheck(userId);
@@ -93,7 +101,7 @@ export class DailyStatusScheduler {
       await this.dailyStatusService.incrementReminder(userId);
 
       await this.telegramApi
-        .sendMessage(link.externalChatId, message, buildStatusKeyboard())
+        .sendMessage(link.externalChatId, buildMessage(locale), buildStatusKeyboard(locale))
         .catch((error) => this.logger.error(`Failed to send prompt to user ${userId}`, error));
     }
   }

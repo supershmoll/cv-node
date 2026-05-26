@@ -6,7 +6,7 @@
     "node": ">=18.x"
   },
   "scripts": {
-    "schema": "ts-node create-definitions",
+    "schema": "npx ts-node create-definitions",
     "start": "npm run schema && nest start --watch",
     "clean": "rimraf dist",
     "build": "npm run clean && nest build",
