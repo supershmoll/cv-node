@@ -36,10 +36,18 @@ export class ProfileService {
     return this.profileRepository.save(profile);
   }
 
-  async updateProfile({ userId, first_name, last_name }: UpdateProfileInput) {
+  async updateProfile({
+    userId,
+    first_name,
+    last_name,
+    birth_date,
+    education,
+  }: UpdateProfileInput) {
     const profile = await this.findOneById(userId);
     profile.first_name = first_name;
     profile.last_name = last_name;
+    profile.birth_date = birth_date ?? null;
+    profile.education = education ?? null;
     return this.profileRepository.save(profile);
   }
 

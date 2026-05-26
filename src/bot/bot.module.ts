@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AvailabilityModule } from "src/availability/availability.module";
+import { AiModule } from "src/ai/ai.module";
 import { UsersModule } from "src/users/users.module";
 import { BotLinkService } from "./bot-link.service";
 import { BotResolver } from "./bot.resolver";
@@ -21,6 +22,7 @@ import {
     TypeOrmModule.forFeature([ChatLinkModel, ChatLinkCodeModel, DailyStatusCheckModel]),
     UsersModule,
     AvailabilityModule,
+    AiModule,
   ],
   controllers: [TelegramController],
   providers: [

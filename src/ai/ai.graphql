@@ -1,0 +1,71 @@
+enum HrAssistantSource {
+  AI
+  RULES
+}
+
+enum ProjectSuggestionSource {
+  AI
+  RULES
+}
+
+enum ProjectCandidateSource {
+  AI
+  RULES
+}
+
+type HrAssistantResponse {
+  answer: String!
+  source: HrAssistantSource!
+}
+
+type ProjectSuggestion {
+  name: String!
+  domain: String!
+  description: String!
+  environment: [String!]!
+  source: ProjectSuggestionSource!
+}
+
+type ProjectCandidate {
+  userId: ID!
+  fullName: String!
+  email: String!
+  department: String
+  position: String
+  matchScore: Int!
+  matchedSkills: [String!]!
+  missingSkills: [String!]!
+  availabilityStatus: AvailabilityStatus!
+  age: Int
+  education: String
+  summary: String!
+  source: ProjectCandidateSource!
+}
+
+input AskHrAssistantInput {
+  question: String!
+  locale: String
+}
+
+input SuggestProjectInput {
+  brief: String!
+  locale: String
+}
+
+input ProjectCandidatesInput {
+  projectId: ID!
+  minAge: Int
+  maxAge: Int
+  educationHint: String
+  departmentId: ID
+  positionId: ID
+  requireAvailable: Boolean
+  limit: Int
+  locale: String
+}
+
+extend type Query {
+  askHrAssistant(input: AskHrAssistantInput!): HrAssistantResponse!
+  suggestProject(input: SuggestProjectInput!): ProjectSuggestion!
+  projectCandidates(input: ProjectCandidatesInput!): [ProjectCandidate!]!
+}

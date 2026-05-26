@@ -27,6 +27,12 @@ export class ProfileModel implements Profile {
   @Column({ nullable: true })
   avatar: string;
 
+  @Column("date", { nullable: true })
+  birth_date?: string;
+
+  @Column("varchar", { nullable: true })
+  education?: string;
+
   @Column("simple-json", { default: [] })
   skills: SkillMastery[];
 

@@ -23,7 +23,14 @@ export class UsersService {
 
   findAll() {
     return this.userRepository.find({
-      relations: ["profile", "cvs", "department", "position"],
+      relations: [
+        "profile",
+        "cvs",
+        "cvs.projects",
+        "cvs.projects.project",
+        "department",
+        "position",
+      ],
     });
   }
 

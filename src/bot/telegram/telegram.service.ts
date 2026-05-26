@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { AvailabilityStatus } from "src/graphql";
+import { AvailabilityIntentService } from "src/ai/availability-intent.service";
 import { AvailabilityService } from "src/availability/availability.service";
 import { BotLinkService } from "../bot-link.service";
 import { DailyStatusService } from "../daily-status.service";
@@ -29,7 +30,8 @@ export class TelegramUpdateHandler {
     private readonly telegramApi: TelegramApiService,
     private readonly botLinkService: BotLinkService,
     private readonly availabilityService: AvailabilityService,
-    private readonly dailyStatusService: DailyStatusService
+    private readonly dailyStatusService: DailyStatusService,
+    private readonly availabilityIntentService: AvailabilityIntentService
   ) {}
 
   async handleUpdate(update: TelegramUpdate) {
@@ -86,11 +88,46 @@ export class TelegramUpdateHandler {
       return;
     }
 
-    await this.telegramApi.sendMessage(
-      chatId,
-      translateBotMessage(locale, "useButtonsBelow"),
-      buildStatusKeyboard(locale)
-    );
+    await this.handleNaturalLanguageStatus(chatId, link, text, locale);
+  }
+
+  private async handleNaturalLanguageStatus(
+    chatId: string,
+    link: ChatLinkModel,
+    text: string,
+    locale: BotLocale
+  ) {
+    const intent = await this.availabilityIntentService.parse(text, locale);
+
+    if (!intent.status) {
+      await this.telegramApi.sendMessage(
+        chatId,
+        translateBotMessage(locale, "ai.couldNotUnderstand"),
+        buildStatusKeyboard(locale)
+      );
+      return;
+    }
+
+    try {
+      const availability = await this.availabilityService.setAvailabilityFromBot(
+        String(link.userId),
+        { status: intent.status }
+      );
+      await this.dailyStatusService.confirmToday(String(link.userId), intent.status);
+      await this.telegramApi.sendMessage(
+        chatId,
+        translateBotMessage(locale, "statusConfirmed", {
+          status: translateStatusLabel(locale, availability.status),
+        }),
+        buildStatusKeyboard(locale)
+      );
+    } catch (error) {
+      this.logger.error("Failed to update status from natural language", error);
+      await this.telegramApi.sendMessage(
+        chatId,
+        translateBotMessage(locale, "updateFailed")
+      );
+    }
   }
 
   private async handleStart(message: TelegramMessage) {
@@ -265,6 +302,7 @@ export class TelegramUpdateHandler {
         translateBotMessage(locale, "help.line2"),
         translateBotMessage(locale, "help.line3"),
         translateBotMessage(locale, "help.line4"),
+        translateBotMessage(locale, "help.line5"),
       ].join("\n"),
       buildStatusKeyboard(locale)
     );

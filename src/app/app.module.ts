@@ -19,6 +19,7 @@ import { CvProjectsModule } from "src/cv_projects/cv_projects.module";
 import { ProjectsModule } from "../projects/projects.module";
 import { MailModule } from "src/mail/mail.module";
 import { AvailabilityModule } from "src/availability/availability.module";
+import { AiModule } from "src/ai/ai.module";
 import { BotModule } from "src/bot/bot.module";
 import { Void } from "./void.scalar";
 import { RolesGuard } from "./guards/roles.guard";
@@ -63,6 +64,7 @@ import { AccessTokenGuard } from "src/auth/guards/access_token.guard";
     CvProjectsModule,
     MailModule,
     AvailabilityModule,
+    AiModule,
     BotModule,
   ],
   providers: [

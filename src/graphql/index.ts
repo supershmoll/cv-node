@@ -8,6 +8,21 @@
 /* tslint:disable */
 /* eslint-disable */
 
+export enum HrAssistantSource {
+    AI = "AI",
+    RULES = "RULES"
+}
+
+export enum ProjectSuggestionSource {
+    AI = "AI",
+    RULES = "RULES"
+}
+
+export enum ProjectCandidateSource {
+    AI = "AI",
+    RULES = "RULES"
+}
+
 export enum AvailabilityStatus {
     OFFICE = "OFFICE",
     REMOTE = "REMOTE",
@@ -44,6 +59,28 @@ export enum Mastery {
 export enum UserRole {
     Employee = "Employee",
     Admin = "Admin"
+}
+
+export interface AskHrAssistantInput {
+    question: string;
+    locale?: Nullable<string>;
+}
+
+export interface SuggestProjectInput {
+    brief: string;
+    locale?: Nullable<string>;
+}
+
+export interface ProjectCandidatesInput {
+    projectId: string;
+    minAge?: Nullable<number>;
+    maxAge?: Nullable<number>;
+    educationHint?: Nullable<string>;
+    departmentId?: Nullable<string>;
+    positionId?: Nullable<string>;
+    requireAvailable?: Nullable<boolean>;
+    limit?: Nullable<number>;
+    locale?: Nullable<string>;
 }
 
 export interface AuthInput {
@@ -210,6 +247,8 @@ export interface UpdateProfileInput {
     userId: string;
     first_name?: Nullable<string>;
     last_name?: Nullable<string>;
+    birth_date?: Nullable<string>;
+    education?: Nullable<string>;
 }
 
 export interface DeleteProfileInput {
@@ -324,17 +363,39 @@ export interface UpdateUserInput {
     role?: Nullable<UserRole>;
 }
 
-export interface DeleteResult {
-    affected: number;
+export interface HrAssistantResponse {
+    answer: string;
+    source: HrAssistantSource;
 }
 
-export interface AuthResult {
-    user: User;
-    access_token: string;
-    refresh_token: string;
+export interface ProjectSuggestion {
+    name: string;
+    domain: string;
+    description: string;
+    environment: string[];
+    source: ProjectSuggestionSource;
+}
+
+export interface ProjectCandidate {
+    userId: string;
+    fullName: string;
+    email: string;
+    department?: Nullable<string>;
+    position?: Nullable<string>;
+    matchScore: number;
+    matchedSkills: string[];
+    missingSkills: string[];
+    availabilityStatus: AvailabilityStatus;
+    age?: Nullable<number>;
+    education?: Nullable<string>;
+    summary: string;
+    source: ProjectCandidateSource;
 }
 
 export interface IQuery {
+    askHrAssistant(input: AskHrAssistantInput): HrAssistantResponse | Promise<HrAssistantResponse>;
+    suggestProject(input: SuggestProjectInput): ProjectSuggestion | Promise<ProjectSuggestion>;
+    projectCandidates(input: ProjectCandidatesInput): ProjectCandidate[] | Promise<ProjectCandidate[]>;
     login(auth: AuthInput): AuthResult | Promise<AuthResult>;
     myAvailability(): UserAvailability | Promise<UserAvailability>;
     teamAvailability(filter?: Nullable<TeamAvailabilityFilter>): UserAvailability[] | Promise<UserAvailability[]>;
@@ -353,6 +414,16 @@ export interface IQuery {
     skills(): Skill[] | Promise<Skill[]>;
     users(): User[] | Promise<User[]>;
     user(userId: string): User | Promise<User>;
+}
+
+export interface DeleteResult {
+    affected: number;
+}
+
+export interface AuthResult {
+    user: User;
+    access_token: string;
+    refresh_token: string;
 }
 
 export interface UpdateTokenResult {
@@ -509,6 +580,8 @@ export interface Profile {
     last_name?: Nullable<string>;
     full_name?: Nullable<string>;
     avatar?: Nullable<string>;
+    birth_date?: Nullable<string>;
+    education?: Nullable<string>;
     skills: SkillMastery[];
     languages: LanguageProficiency[];
 }

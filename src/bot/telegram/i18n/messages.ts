@@ -33,11 +33,13 @@ export type BotMessageKey =
   | "help.line2"
   | "help.line3"
   | "help.line4"
+  | "help.line5"
   | "lang.current"
   | "lang.choose"
   | "lang.updated"
   | "lang.invalid"
   | "somethingWentWrong"
+  | "ai.couldNotUnderstand"
   | "errors.invalidLink"
   | "errors.expiredLink"
   | "errors.usernameRequired"
@@ -82,11 +84,14 @@ const MESSAGES: Record<BotLocale, Record<BotMessageKey, string>> = {
     "help.line2": "Choose a status button before 12:00 MSK each day.",
     "help.line3": "/status — show current status",
     "help.line4": "/lang — change bot language (en / ru)",
+    "help.line5": "You can also write your status in plain text, e.g. “working remotely” or “в отпуске”.",
     "lang.current": "Current language: {language}",
     "lang.choose": "Choose bot language:",
     "lang.updated": "Language updated to {language}.",
     "lang.invalid": "Use /lang, /lang en, or /lang ru.",
     somethingWentWrong: "Something went wrong.",
+    "ai.couldNotUnderstand":
+      "I couldn't understand that status. Use a button below or try: office, remote, sick day, sick leave, vacation.",
     "errors.invalidLink":
       "Invalid or expired connect link. Request a new one in the HRM app.",
     "errors.expiredLink": "Connect link expired. Open Telegram again from the HRM app.",
@@ -131,11 +136,14 @@ const MESSAGES: Record<BotLocale, Record<BotMessageKey, string>> = {
     "help.line2": "Выбирайте статус кнопкой до 12:00 МСК каждый день.",
     "help.line3": "/status — показать текущий статус",
     "help.line4": "/lang — сменить язык бота (en / ru)",
+    "help.line5": "Можно также написать статус текстом, например: «удалённо» или «в отпуске».",
     "lang.current": "Текущий язык: {language}",
     "lang.choose": "Выберите язык бота:",
     "lang.updated": "Язык изменён на {language}.",
     "lang.invalid": "Используйте /lang, /lang en или /lang ru.",
     somethingWentWrong: "Что-то пошло не так.",
+    "ai.couldNotUnderstand":
+      "Не удалось распознать статус. Используйте кнопки ниже или попробуйте: офис, удалённо, болею, больничный, отпуск.",
     "errors.invalidLink":
       "Недействительная или просроченная ссылка. Запросите новую в приложении HRM.",
     "errors.expiredLink":

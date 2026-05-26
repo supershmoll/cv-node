@@ -21,6 +21,11 @@ TELEGRAM_WEBHOOK_SECRET=""
 TELEGRAM_USE_POLLING="true"
 BOT_LINK_CODE_TTL_MINUTES="15"
 STATUS_CHECK_TIMEZONE="Europe/Moscow"
+
+# AI assistant (optional — rule-based fallback works without a key)
+OPENAI_API_KEY=""
+OPENAI_MODEL="gpt-4o-mini"
+OPENAI_BASE_URL="https://api.openai.com/v1"
 ```
 
 ## Local Database & Docker
@@ -116,6 +121,36 @@ curl "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 ```
 
 Set `TELEGRAM_USE_POLLING=false` (or remove it) in production.
+
+## AI assistant
+
+The backend includes optional AI features:
+
+- **Telegram natural language** — linked users can write status in plain text (e.g. “working remotely”, «в отпуске»). Rule-based parsing always works; set `OPENAI_API_KEY` to enable LLM fallback for ambiguous phrases.
+- **Web HR assistant** — GraphQL query `askHrAssistant` on the Team availability page. Answers are grounded in live team availability data; without an API key, rule-based responses are used.
+- **Project creation assistant** — GraphQL query `suggestProject` (Admin only) on the Projects catalog create dialog. Suggests name, domain, description, and environment stack from the skills catalog.
+
+```graphql
+query {
+  askHrAssistant(input: { question: "Who is in the office?", locale: "en" }) {
+    answer
+    source
+  }
+}
+
+query {
+  suggestProject(input: {
+    brief: "HR portal with React and GraphQL"
+    locale: "en"
+  }) {
+    name
+    domain
+    description
+    environment
+    source
+  }
+}
+```
 
 ## Production
 
