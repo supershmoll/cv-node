@@ -124,11 +124,12 @@ Set `TELEGRAM_USE_POLLING=false` (or remove it) in production.
 
 ## AI assistant
 
-The backend includes optional AI features:
+The backend exposes optional AI GraphQL queries and Telegram natural-language parsing. Without `OPENAI_API_KEY`, rule-based fallbacks are used.
 
-- **Telegram natural language** — linked users can write status in plain text (e.g. “working remotely”, «в отпуске»). Rule-based parsing always works; set `OPENAI_API_KEY` to enable LLM fallback for ambiguous phrases.
-- **Web HR assistant** — GraphQL query `askHrAssistant` on the Team availability page. Answers are grounded in live team availability data; without an API key, rule-based responses are used.
-- **Project creation assistant** — GraphQL query `suggestProject` (Admin only) on the Projects catalog create dialog. Suggests name, domain, description, and environment stack from the skills catalog.
+- **Telegram natural language** — linked users can write status in plain text (e.g. “working remotely”, «в отпуске»).
+- **`askHrAssistant`** — team availability Q&A grounded in live data.
+- **`suggestProject`** — Admin-only project field suggestions from the skills catalog.
+- **`projectCandidates`** — Admin-only staffing matcher (skills, availability, age, education, org fit).
 
 ```graphql
 query {
@@ -147,6 +148,27 @@ query {
     domain
     description
     environment
+    source
+  }
+}
+
+query {
+  projectCandidates(input: {
+    projectId: "1"
+    minAge: 25
+    educationHint: "computer science"
+    requireAvailable: true
+    locale: "en"
+  }) {
+    userId
+    fullName
+    matchScore
+    matchedSkills
+    missingSkills
+    availabilityStatus
+    age
+    education
+    summary
     source
   }
 }
