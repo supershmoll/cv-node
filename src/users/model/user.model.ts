@@ -75,4 +75,7 @@ export class UserModel implements User {
 
   @Column("enum", { enum: UserRole, default: UserRole.Employee })
   role: UserRole;
+
+  @Column("int", { default: 0 })
+  sessionVersion: number;
 }

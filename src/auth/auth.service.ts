@@ -40,12 +40,13 @@ export class AuthService {
     }
   }
 
-  private async signJwt(user: User): Promise<UpdateTokenResult> {
+  private async signJwt(user: User & { sessionVersion?: number }): Promise<UpdateTokenResult> {
     const { id, email, role } = user;
     const payload: JwtPayload = {
       sub: id,
       email,
       role,
+      sessionVersion: user.sessionVersion ?? 0,
     };
     const [access_token, refresh_token] = await Promise.all([
       this.jwtService.signAsync(payload, { expiresIn: "10m" }),

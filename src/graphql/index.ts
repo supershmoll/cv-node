@@ -72,6 +72,10 @@ export interface TeamAvailabilityFilter {
     status?: Nullable<AvailabilityStatus>;
 }
 
+export interface LinkTelegramInput {
+    username: string;
+}
+
 export interface AddCvProjectInput {
     cvId: string;
     projectId: string;
@@ -334,6 +338,7 @@ export interface IQuery {
     myAvailability(): UserAvailability | Promise<UserAvailability>;
     teamAvailability(filter?: Nullable<TeamAvailabilityFilter>): UserAvailability[] | Promise<UserAvailability[]>;
     availabilityHistory(userId: string): AvailabilityEvent[] | Promise<AvailabilityEvent[]>;
+    telegramLinkStatus(): TelegramLinkStatus | Promise<TelegramLinkStatus>;
     cvs(): Cv[] | Promise<Cv[]>;
     cv(cvId: string): Cv | Promise<Cv>;
     departments(): Department[] | Promise<Department[]>;
@@ -360,7 +365,8 @@ export interface IMutation {
     resetPassword(auth: ResetPasswordInput): Nullable<Void> | Promise<Nullable<Void>>;
     updateToken(): UpdateTokenResult | Promise<UpdateTokenResult>;
     setAvailability(input: SetAvailabilityInput): UserAvailability | Promise<UserAvailability>;
-    generateBotLinkCode(): BotLinkCode | Promise<BotLinkCode>;
+    linkTelegramAccount(input: LinkTelegramInput): TelegramLinkResult | Promise<TelegramLinkResult>;
+    unlinkTelegramAccount(): DeleteResult | Promise<DeleteResult>;
     addCvProject(project: AddCvProjectInput): Cv | Promise<Cv>;
     updateCvProject(project: UpdateCvProjectInput): Cv | Promise<Cv>;
     removeCvProject(project: RemoveCvProjectInput): Cv | Promise<Cv>;
@@ -423,9 +429,18 @@ export interface AvailabilityEvent {
     updatedBy: AvailabilityUpdatedBy;
 }
 
-export interface BotLinkCode {
+export interface TelegramLinkResult {
     code: string;
+    deepLink: string;
+    botUsername: string;
     expiresAt: string;
+    telegramUsername: string;
+}
+
+export interface TelegramLinkStatus {
+    linked: boolean;
+    telegramUsername?: Nullable<string>;
+    botUsername: string;
 }
 
 export interface CvProject {

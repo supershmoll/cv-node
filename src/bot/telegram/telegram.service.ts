@@ -2,15 +2,16 @@ import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { AvailabilityStatus } from "src/graphql";
 import { AvailabilityService } from "src/availability/availability.service";
 import { BotLinkService } from "../bot-link.service";
+import { DailyStatusService } from "../daily-status.service";
 import { ChatPlatform } from "../model/chat-link.model";
-import { STATUS_LABELS } from "../bot.constants";
+import { STATUS_LABELS, UNAUTHORIZED_BOT_MESSAGE } from "../bot.constants";
 import {
   TelegramCallbackQuery,
   TelegramMessage,
-  TelegramReplyMarkup,
   TelegramUpdate,
 } from "./telegram.types";
 import { TelegramApiService } from "./telegram-api.service";
+import { buildStatusKeyboard } from "./telegram-messages";
 
 @Injectable()
 export class TelegramUpdateHandler {
@@ -19,7 +20,8 @@ export class TelegramUpdateHandler {
   constructor(
     private readonly telegramApi: TelegramApiService,
     private readonly botLinkService: BotLinkService,
-    private readonly availabilityService: AvailabilityService
+    private readonly availabilityService: AvailabilityService,
+    private readonly dailyStatusService: DailyStatusService
   ) {}
 
   async handleUpdate(update: TelegramUpdate) {
@@ -38,41 +40,18 @@ export class TelegramUpdateHandler {
     const text = message.text?.trim() ?? "";
 
     if (text.startsWith("/start")) {
-      await this.sendWelcome(chatId);
+      await this.handleStart(message);
       return;
     }
 
-    if (text.startsWith("/link")) {
-      const code = text.split(/\s+/)[1];
-      if (!code) {
-        await this.telegramApi.sendMessage(
-          chatId,
-          "Usage: /link 123456\nGenerate a code in the HRM app first."
-        );
-        return;
-      }
-
-      try {
-        const link = await this.botLinkService.linkChat(
-          ChatPlatform.TELEGRAM,
-          chatId,
-          code
-        );
-        const name = link.user.profile?.full_name ?? link.user.email;
-        await this.telegramApi.sendMessage(
-          chatId,
-          `Account linked to ${name}. Use the buttons below to update your status.`,
-          this.buildStatusKeyboard()
-        );
-      } catch (error) {
-        const messageText = this.extractErrorMessage(error);
-        await this.telegramApi.sendMessage(chatId, messageText);
-      }
+    const link = await this.botLinkService.findByExternalChat(ChatPlatform.TELEGRAM, chatId);
+    if (!link) {
+      await this.telegramApi.sendMessage(chatId, UNAUTHORIZED_BOT_MESSAGE);
       return;
     }
 
     if (text.startsWith("/status")) {
-      await this.sendCurrentStatus(chatId);
+      await this.sendCurrentStatus(chatId, link.userId, link.user.profile?.full_name ?? link.user.email);
       return;
     }
 
@@ -81,20 +60,67 @@ export class TelegramUpdateHandler {
       return;
     }
 
-    await this.telegramApi.sendMessage(
-      chatId,
-      "Unknown command. Try /help or use the menu buttons."
-    );
+    await this.telegramApi.sendMessage(chatId, "Use the buttons below to confirm today's status.", buildStatusKeyboard());
+  }
+
+  private async handleStart(message: TelegramMessage) {
+    const chatId = String(message.chat.id);
+    const parts = message.text?.trim().split(/\s+/) ?? [];
+    const code = parts[1];
+
+    if (code) {
+      try {
+        const link = await this.botLinkService.linkChatFromStart(
+          ChatPlatform.TELEGRAM,
+          chatId,
+          code,
+          message.from?.username
+        );
+        const name = link.user.profile?.full_name ?? link.user.email;
+        await this.telegramApi.sendMessage(
+          chatId,
+          `Telegram linked to ${name}. You will receive daily status prompts at 9:00 MSK.`,
+          buildStatusKeyboard()
+        );
+      } catch (error) {
+        await this.telegramApi.sendMessage(chatId, this.extractErrorMessage(error));
+      }
+      return;
+    }
+
+    const link = await this.botLinkService.findByExternalChat(ChatPlatform.TELEGRAM, chatId);
+    if (link) {
+      const name = link.user.profile?.full_name ?? link.user.email;
+      await this.telegramApi.sendMessage(
+        chatId,
+        `Welcome back, ${name}. Confirm today's status:`,
+        buildStatusKeyboard()
+      );
+      return;
+    }
+
+    await this.telegramApi.sendMessage(chatId, UNAUTHORIZED_BOT_MESSAGE);
   }
 
   private async handleCallbackQuery(callback: TelegramCallbackQuery) {
     const chatId = String(callback.message?.chat.id ?? callback.from.id);
     const data = callback.data ?? "";
 
+    const link = await this.botLinkService.findByExternalChat(ChatPlatform.TELEGRAM, chatId);
+    if (!link) {
+      await this.telegramApi.answerCallbackQuery(callback.id);
+      await this.telegramApi.sendMessage(chatId, UNAUTHORIZED_BOT_MESSAGE);
+      return;
+    }
+
     await this.telegramApi.answerCallbackQuery(callback.id);
 
     if (data === "action:status") {
-      await this.sendCurrentStatus(chatId);
+      await this.sendCurrentStatus(
+        chatId,
+        link.userId,
+        link.user.profile?.full_name ?? link.user.email
+      );
       return;
     }
 
@@ -105,28 +131,16 @@ export class TelegramUpdateHandler {
         return;
       }
 
-      const link = await this.botLinkService.findByExternalChat(
-        ChatPlatform.TELEGRAM,
-        chatId
-      );
-
-      if (!link) {
-        await this.telegramApi.sendMessage(
-          chatId,
-          "Link your HRM account first with /link <code>."
-        );
-        return;
-      }
-
       try {
         const availability = await this.availabilityService.setAvailabilityFromBot(
           String(link.userId),
           { status }
         );
+        await this.dailyStatusService.confirmToday(String(link.userId), status);
         await this.telegramApi.sendMessage(
           chatId,
-          `Status updated to ${STATUS_LABELS[availability.status]}.`,
-          this.buildStatusKeyboard()
+          `Status confirmed for today: ${STATUS_LABELS[availability.status]}.`,
+          buildStatusKeyboard()
         );
       } catch (error) {
         this.logger.error("Failed to update status from Telegram", error);
@@ -138,55 +152,17 @@ export class TelegramUpdateHandler {
     }
   }
 
-  private async sendWelcome(chatId: string) {
-    const link = await this.botLinkService.findByExternalChat(
-      ChatPlatform.TELEGRAM,
-      chatId
-    );
-
-    if (link) {
-      const name = link.user.profile?.full_name ?? link.user.email;
-      await this.telegramApi.sendMessage(
-        chatId,
-        `Welcome back, ${name}. Choose your current availability:`,
-        this.buildStatusKeyboard()
-      );
-      return;
-    }
+  private async sendCurrentStatus(chatId: string, userId: string, name: string) {
+    const availability = await this.availabilityService.getMyAvailability(String(userId));
+    const todayCheck = await this.dailyStatusService.getTodayCheck(String(userId));
+    const confirmedToday = todayCheck?.confirmedAt
+      ? `\nToday confirmed: ${STATUS_LABELS[todayCheck.confirmedStatus ?? availability.status]}`
+      : "\nToday's status is not confirmed yet.";
 
     await this.telegramApi.sendMessage(
       chatId,
-      [
-        "Welcome to the HRM availability bot.",
-        "",
-        "1. Log in to the HRM app and generate a link code.",
-        "2. Send /link <code> here (example: /link 482913).",
-        "3. Use the buttons to set On shift, Sick, Vacation, etc.",
-      ].join("\n")
-    );
-  }
-
-  private async sendCurrentStatus(chatId: string) {
-    const link = await this.botLinkService.findByExternalChat(
-      ChatPlatform.TELEGRAM,
-      chatId
-    );
-
-    if (!link) {
-      await this.telegramApi.sendMessage(
-        chatId,
-        "No linked account. Generate a code in the app, then send /link <code>."
-      );
-      return;
-    }
-
-    const availability = await this.availabilityService.getMyAvailability(String(link.userId));
-    const name = link.user.profile?.full_name ?? link.user.email;
-
-    await this.telegramApi.sendMessage(
-      chatId,
-      `${name}\nCurrent status: ${STATUS_LABELS[availability.status]}`,
-      this.buildStatusKeyboard()
+      `${name}\nCurrent status: ${STATUS_LABELS[availability.status]}${confirmedToday}`,
+      buildStatusKeyboard()
     );
   }
 
@@ -194,31 +170,12 @@ export class TelegramUpdateHandler {
     await this.telegramApi.sendMessage(
       chatId,
       [
-        "Commands:",
-        "/start - welcome and menu",
-        "/link <code> - connect your HRM account",
-        "/status - show current availability",
-        "",
-        "Or use the inline buttons after linking.",
+        "This bot is linked to your HRM account.",
+        "Choose a status button before 12:00 MSK each day.",
+        "/status - show current status",
       ].join("\n"),
-      this.buildStatusKeyboard()
+      buildStatusKeyboard()
     );
-  }
-
-  private buildStatusKeyboard(): TelegramReplyMarkup {
-    return {
-      inline_keyboard: [
-        [
-          { text: "On shift", callback_data: `status:${AvailabilityStatus.ON_SHIFT}` },
-          { text: "Off shift", callback_data: `status:${AvailabilityStatus.OFF_SHIFT}` },
-        ],
-        [
-          { text: "Sick", callback_data: `status:${AvailabilityStatus.SICK}` },
-          { text: "Vacation", callback_data: `status:${AvailabilityStatus.VACATION}` },
-        ],
-        [{ text: "My status", callback_data: "action:status" }],
-      ],
-    };
   }
 
   private extractErrorMessage(error: unknown) {

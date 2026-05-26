@@ -20,6 +20,9 @@ export class ChatLinkModel {
   @Column("int", { unique: true })
   userId: string;
 
+  @Column("varchar", { nullable: true })
+  telegramUsername?: string;
+
   @ManyToOne(() => UserModel, { onDelete: "CASCADE" })
   @JoinColumn({ name: "userId" })
   user: UserModel;

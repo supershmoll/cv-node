@@ -15,4 +15,7 @@ export class ChatLinkCodeModel {
 
   @Column("timestamptz")
   expiresAt: string;
+
+  @Column("varchar")
+  telegramUsername: string;
 }

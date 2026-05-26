@@ -16,9 +16,11 @@ SENTRY_DSN_URL="https://url"
 
 # Telegram availability bot (optional)
 TELEGRAM_BOT_TOKEN=""
+TELEGRAM_BOT_USERNAME="hrmdiplomabot"
 TELEGRAM_WEBHOOK_SECRET=""
 TELEGRAM_USE_POLLING="true"
 BOT_LINK_CODE_TTL_MINUTES="15"
+STATUS_CHECK_TIMEZONE="Europe/Moscow"
 ```
 
 ## Local Database & Docker
@@ -66,11 +68,42 @@ The backend includes a Telegram bot for updating employee availability (on shift
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
 2. Add to your env file:
    - `TELEGRAM_BOT_TOKEN` — bot token from BotFather
+   - `TELEGRAM_BOT_USERNAME` — bot username without `@` (example: `hrmdiplomabot`)
    - `TELEGRAM_USE_POLLING=true` — for local dev (no webhook/ngrok needed)
-   - `TELEGRAM_WEBHOOK_SECRET` — optional secret for production webhook
+   - `STATUS_CHECK_TIMEZONE=Europe/Moscow` — daily prompt schedule
 3. Start the API: `npm start`
-4. In the HRM app, call the `generateBotLinkCode` mutation while logged in.
-5. In Telegram, send `/link <code>` to your bot, then use the menu buttons.
+4. In the HRM app profile, enter the employee Telegram `@username` and open the returned deep link.
+5. Telegram opens with `/start <token>` and links the account automatically.
+
+### Daily status enforcement (Europe/Moscow)
+
+| Time | Action |
+|------|--------|
+| 09:00 | Send status buttons to all linked Telegram accounts |
+| 10:00, 11:00 | Remind users who have not confirmed today's status |
+| 12:00 | Force-logout users with linked Telegram who still have not confirmed |
+
+Random Telegram users who find the bot cannot use it. They must connect from the HRM app first.
+
+### GraphQL
+
+```graphql
+mutation LinkTelegram($username: String!) {
+  linkTelegramAccount(input: { username: $username }) {
+    deepLink
+    botUsername
+    expiresAt
+  }
+}
+
+query {
+  telegramLinkStatus {
+    linked
+    telegramUsername
+    botUsername
+  }
+}
+```
 
 ### Production webhook
 

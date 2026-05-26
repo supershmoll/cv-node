@@ -1,8 +1,26 @@
-type BotLinkCode {
+input LinkTelegramInput {
+  username: String!
+}
+
+type TelegramLinkResult {
   code: String!
+  deepLink: String!
+  botUsername: String!
   expiresAt: String!
+  telegramUsername: String!
+}
+
+type TelegramLinkStatus {
+  linked: Boolean!
+  telegramUsername: String
+  botUsername: String!
+}
+
+type Query {
+  telegramLinkStatus: TelegramLinkStatus!
 }
 
 type Mutation {
-  generateBotLinkCode: BotLinkCode!
+  linkTelegramAccount(input: LinkTelegramInput!): TelegramLinkResult!
+  unlinkTelegramAccount: DeleteResult!
 }

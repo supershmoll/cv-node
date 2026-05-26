@@ -123,4 +123,14 @@ export class UsersService {
   deleteUser(userId: string) {
     return this.profileService.deleteProfile({ userId });
   }
+
+  async invalidateSession(userId: string) {
+    const user = await this.findOneById(userId);
+    if (!user) {
+      return null;
+    }
+
+    user.sessionVersion = (user.sessionVersion ?? 0) + 1;
+    return this.userRepository.save(user);
+  }
 }
