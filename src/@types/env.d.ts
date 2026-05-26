@@ -6,7 +6,8 @@ declare namespace NodeJS {
     JWT_SECRET: string;
     JWT_SECRET_2: string;
     CLOUDINARY_URL: string;
-    MAIL_FROM: string;
+    MAIL_FROM?: string;
+    RESEND_API_KEY?: string;
     SMTP_URL: string;
     CHROME_WS: string;
     SENTRY_DSN_URL?: string;

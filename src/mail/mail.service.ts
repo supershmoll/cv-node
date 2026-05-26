@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { VerifyMailInput } from "src/graphql";
 import { InjectRepository } from "@nestjs/typeorm";
 import { MailModel } from "./model/mail.model";
@@ -8,15 +13,43 @@ import { Resend } from "resend";
 
 @Injectable()
 export class MailService {
-  private resend: Resend;
+  private readonly logger = new Logger(MailService.name);
+  private readonly resend: Resend | null;
 
   constructor(
     @InjectRepository(MailModel)
     private readonly mailRepository: Repository<MailModel>,
     private readonly usersService: UsersService,
   ) {
-    // This grabs the API key from Railway
-    this.resend = new Resend(process.env.RESEND_API_KEY);
+    const apiKey = process.env.RESEND_API_KEY?.trim();
+    if (apiKey) {
+      this.resend = new Resend(apiKey);
+      return;
+    }
+
+    this.resend = null;
+    this.logger.warn("RESEND_API_KEY is not set — email delivery is disabled.");
+  }
+
+  private ensureMailConfigured() {
+    if (!this.resend || !process.env.MAIL_FROM?.trim()) {
+      throw new ServiceUnavailableException({ message: "Failed to send email" });
+    }
+  }
+
+  private async sendEmail(input: {
+    to: string;
+    subject: string;
+    html: string;
+  }) {
+    this.ensureMailConfigured();
+
+    return this.resend!.emails.send({
+      from: `Curriculum Vitae <${process.env.MAIL_FROM}>`,
+      to: input.to,
+      subject: input.subject,
+      html: input.html,
+    });
   }
 
   findOneByEmail(email: string) {
@@ -40,9 +73,7 @@ export class MailService {
     }
     await this.mailRepository.save(mail);
 
-    // Fires over HTTPS, bypassing Railway's port blocking!
-    return this.resend.emails.send({
-      from: `Curriculum Vitae <${process.env.MAIL_FROM}>`,
+    return this.sendEmail({
       to: email,
       subject: "Verify email",
       html: `
@@ -69,9 +100,7 @@ export class MailService {
   }
 
   async sendResetPasswordEmail(email: string, url: string) {
-    // Fires over HTTPS, bypassing Railway's port blocking!
-    return this.resend.emails.send({
-      from: `Curriculum Vitae <${process.env.MAIL_FROM}>`,
+    return this.sendEmail({
       to: email,
       subject: "Password Reset Request",
       html: `
